@@ -299,7 +299,7 @@ void CScreencopyPortal::onCreateSession(sdbus::MethodCall& call) {
 
     // create objects
     PSESSION->session            = createDBusSession(sessionHandle);
-    PSESSION->session->onDestroy = [PSESSION, this]() {
+	PSESSION->session->onDestroy = [PSESSION, this]() {
         if (PSESSION->sharingData.active) {
             m_pPipewire->destroyStream(PSESSION);
             Debug::log(LOG, "[screencopy] Stream destroyed");
