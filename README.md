@@ -1,4 +1,4 @@
-# xdg-desktop-portal-hyprland
+# xdg-desktop-portal-hyprland With GTK
 An [XDG Desktop Portal](https://github.com/flatpak/xdg-desktop-portal) backend for Hyprland.
 
 ## Installing
