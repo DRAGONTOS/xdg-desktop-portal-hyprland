@@ -1,15 +1,21 @@
-subdir('src')
+# select either qt6 or qt5
+qtdep = dependency('qt6', 'qt5', modules: ['Widgets'])
+qtver = qtdep.version()
+qt = import('qt' + qtver[0])
 
-exe_src = ['main.go']
+ui_files = qt.compile_ui(sources: 'mainpicker.ui')
+moc = qt.compile_moc(headers: 'mainpicker.h')
 
-custom_target('hyprland-share-picker-gtk',
-    output: 'hyprland-share-picker',
-    input: exe_src,
-    command: ['go', 'build', '-o', '@OUTPUT@', '@INPUT@'],
-    build_by_default: true
-)
+sources = files([
+  'main.cpp',
+  'mainpicker.cpp',
+  'mainpicker.h',
+])
 
-install_data(
-    sources: ['README.md'],
-    install_dir: join_paths(get_option('datadir'), meson.project_name())
+executable('hyprland-share-picker',
+  sources,
+  ui_files,
+  moc,
+  dependencies: qtdep,
+  install: true
 )
