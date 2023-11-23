@@ -3,7 +3,7 @@ An [XDG Desktop Portal](https://github.com/flatpak/xdg-desktop-portal) backend f
 
 ## Installing
 ```sh
-git clone --recursive https://github.com/dragontos/xdg-desktop-portal-hyprland
+git clone -b theoparis/fix-build --recursive https://github.com/dragontos/xdg-desktop-portal-hyprland
 cd xdg-desktop-portal-hyprland/
 make all
 sudo make install
