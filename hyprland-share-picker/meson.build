@@ -1,9 +1,3 @@
-project('hyprland-share-picker-gtk',
-    version: '0.0.1',
-    license: 'MIT',
-    meson_version: '>=0.50.0'
-)
-
 subdir('src')
 
 exe_src = ['main.go']
