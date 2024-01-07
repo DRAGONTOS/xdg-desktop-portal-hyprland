@@ -12,6 +12,8 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.systems.follows = "systems";
     };
+
+    hyprlang.url = "github:hyprwm/hyprlang";
   };
 
   outputs = {

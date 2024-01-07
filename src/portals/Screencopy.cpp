@@ -46,7 +46,8 @@ static void wlrOnReady(void* data, zwlr_screencopy_frame_v1* frame, uint32_t tv_
 
     g_pPortalManager->m_sPortals.screencopy->m_pPipewire->enqueue(PSESSION);
 
-    g_pPortalManager->m_sPortals.screencopy->queueNextShareFrame(PSESSION);
+    if (g_pPortalManager->m_sPortals.screencopy->m_pPipewire->streamFromSession(PSESSION))
+        g_pPortalManager->m_sPortals.screencopy->queueNextShareFrame(PSESSION);
 
     zwlr_screencopy_frame_v1_destroy(frame);
     PSESSION->sharingData.frameCallback = nullptr;
@@ -284,6 +285,8 @@ static const hyprland_toplevel_export_frame_v1_listener hyprlandFrameListener = 
 void CScreencopyPortal::onCreateSession(sdbus::MethodCall& call) {
     sdbus::ObjectPath requestHandle, sessionHandle;
 
+    g_pPortalManager->m_sHelpers.toplevel->activate();
+
     call >> requestHandle;
     call >> sessionHandle;
 
@@ -299,13 +302,16 @@ void CScreencopyPortal::onCreateSession(sdbus::MethodCall& call) {
 
     // create objects
     PSESSION->session            = createDBusSession(sessionHandle);
-	    PSESSION->session->onDestroy = [PSESSION, this]() {
+    PSESSION->session->onDestroy = [PSESSION, this]() {
         if (PSESSION->sharingData.active) {
             m_pPipewire->destroyStream(PSESSION);
             Debug::log(LOG, "[screencopy] Stream destroyed");
         }
         PSESSION->session.release();
         Debug::log(LOG, "[screencopy] Session destroyed");
+
+        // deactivate toplevel so it doesn't listen and waste battery
+        g_pPortalManager->m_sHelpers.toplevel->deactivate();
     };
     PSESSION->request            = createDBusRequest(requestHandle);
     PSESSION->request->onDestroy = [PSESSION]() { PSESSION->request.release(); };
@@ -1084,7 +1090,7 @@ uint32_t CPipewireConnection::buildFormatsFor(spa_pod_builder* b[2], const spa_p
 
         paramCount = 2;
         params[0]  = build_format(b[0], pwFromDrmFourcc(stream->pSession->sharingData.frameInfoDMA.fmt), stream->pSession->sharingData.frameInfoDMA.w,
-                                 stream->pSession->sharingData.frameInfoDMA.h, stream->pSession->sharingData.framerate, modifiers, modCount);
+                                  stream->pSession->sharingData.frameInfoDMA.h, stream->pSession->sharingData.framerate, modifiers, modCount);
         assert(params[0] != NULL);
         params[1] = build_format(b[1], pwFromDrmFourcc(stream->pSession->sharingData.frameInfoSHM.fmt), stream->pSession->sharingData.frameInfoSHM.w,
                                  stream->pSession->sharingData.frameInfoSHM.h, stream->pSession->sharingData.framerate, NULL, 0);
@@ -1094,7 +1100,7 @@ uint32_t CPipewireConnection::buildFormatsFor(spa_pod_builder* b[2], const spa_p
 
         paramCount = 1;
         params[0]  = build_format(b[0], pwFromDrmFourcc(stream->pSession->sharingData.frameInfoSHM.fmt), stream->pSession->sharingData.frameInfoSHM.w,
-                                 stream->pSession->sharingData.frameInfoSHM.h, stream->pSession->sharingData.framerate, NULL, 0);
+                                  stream->pSession->sharingData.frameInfoSHM.h, stream->pSession->sharingData.framerate, NULL, 0);
     }
 
     if (modifiers)
@@ -1117,6 +1123,11 @@ CPipewireConnection::SPWStream* CPipewireConnection::streamFromSession(CScreenco
 
 void CPipewireConnection::enqueue(CScreencopyPortal::SSession* pSession) {
     const auto PSTREAM = streamFromSession(pSession);
+
+    if (!PSTREAM) {
+        Debug::log(ERR, "[pw] Attempted enqueue on invalid session??");
+        return;
+    }
 
     Debug::log(TRACE, "[pw] enqueue on {}", (void*)PSTREAM);
 
@@ -1201,6 +1212,11 @@ void CPipewireConnection::enqueue(CScreencopyPortal::SSession* pSession) {
 
 void CPipewireConnection::dequeue(CScreencopyPortal::SSession* pSession) {
     const auto PSTREAM = streamFromSession(pSession);
+
+    if (!PSTREAM) {
+        Debug::log(ERR, "[pw] Attempted dequeue on invalid session??");
+        return;
+    }
 
     Debug::log(TRACE, "[pw] dequeue on {}", (void*)PSTREAM);
 

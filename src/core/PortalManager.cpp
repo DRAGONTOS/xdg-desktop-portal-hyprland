@@ -198,6 +198,25 @@ inline const zwp_linux_dmabuf_feedback_v1_listener dmabufFeedbackListener = {
 
 //
 
+CPortalManager::CPortalManager() {
+    const auto XDG_CONFIG_HOME = getenv("XDG_CONFIG_HOME");
+    const auto HOME            = getenv("HOME");
+
+    if (!HOME && !XDG_CONFIG_HOME) {
+        Debug::log(CRIT, "Cannot proceed: neither $HOME nor $XDG_CONFIG_HOME is present in env");
+        throw "$HOME and $XDG_CONFIG_HOME both missing from env";
+    }
+
+    std::string path = XDG_CONFIG_HOME ? std::string{XDG_CONFIG_HOME} + "/hypr/xdph.conf" : std::string{HOME} + "/.config/hypr/xdph.conf";
+
+    m_sConfig.config = std::make_unique<Hyprlang::CConfig>(path.c_str(), Hyprlang::SConfigOptions{.allowMissingConfig = true});
+
+    m_sConfig.config->addConfigValue("general:toplevel_dynamic_bind", {0L});
+
+    m_sConfig.config->commence();
+    m_sConfig.config->parse();
+}
+
 void CPortalManager::onGlobal(void* data, struct wl_registry* registry, uint32_t name, const char* interface, uint32_t version) {
     const std::string INTERFACE = interface;
 
@@ -234,9 +253,13 @@ void CPortalManager::onGlobal(void* data, struct wl_registry* registry, uint32_t
     else if (INTERFACE == wl_shm_interface.name)
         m_sWaylandConnection.shm = (wl_shm*)wl_registry_bind(registry, name, &wl_shm_interface, version);
 
-    else if (INTERFACE == zwlr_foreign_toplevel_manager_v1_interface.name)
-        m_sHelpers.toplevel =
-            std::make_unique<CToplevelManager>((zwlr_foreign_toplevel_manager_v1*)wl_registry_bind(registry, name, &zwlr_foreign_toplevel_manager_v1_interface, version));
+    else if (INTERFACE == zwlr_foreign_toplevel_manager_v1_interface.name) {
+        m_sHelpers.toplevel = std::make_unique<CToplevelManager>(registry, name, version);
+
+        // remove when another fix is found for https://github.com/hyprwm/xdg-desktop-portal-hyprland/issues/147
+        if (!std::any_cast<Hyprlang::INT>(m_sConfig.config->getConfigValue("general:toplevel_dynamic_bind")))
+            m_sHelpers.toplevel->activate();
+    }
 }
 
 void CPortalManager::onGlobalRemoved(void* data, struct wl_registry* registry, uint32_t name) {
@@ -331,7 +354,7 @@ void CPortalManager::startEventLoop() {
 
     std::thread pollThr([this, &pollfds]() {
         while (1) {
-            int ret = poll(pollfds, 3, 5 /* 5 seconds, reasonable. It's because we might need to terminate */);
+            int ret = poll(pollfds, 3, 5000 /* 5 seconds, reasonable. It's because we might need to terminate */);
             if (ret < 0) {
                 Debug::log(CRIT, "[core] Polling fds failed with {}", strerror(errno));
                 g_pPortalManager->terminate();
